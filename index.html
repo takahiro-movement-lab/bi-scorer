@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Barthel Index 採点ツール</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif;
+      background: #f0f4f8;
+      color: #2d3748;
+      min-height: 100vh;
+      padding: 24px 16px;
+    }
+    .container { max-width: 900px; margin: 0 auto; }
+
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #1a365d;
+      margin-bottom: 4px;
+    }
+    .subtitle { font-size: 0.85rem; color: #718096; margin-bottom: 20px; }
+
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+    .card-title {
+      font-size: 0.8rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #718096;
+      margin-bottom: 10px;
+    }
+
+    /* API Key section */
+    .api-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .api-row input[type="password"], .api-row input[type="text"] {
+      flex: 1;
+      min-width: 200px;
+      padding: 8px 12px;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .api-row input:focus { border-color: #4299e1; }
+    .api-save-label { display: flex; align-items: center; gap: 6px; font-size: 0.85rem; color: #4a5568; cursor: pointer; white-space: nowrap; }
+    .api-save-label input[type="checkbox"] { cursor: pointer; }
+
+    /* Textarea */
+    textarea {
+      width: 100%;
+      height: 180px;
+      padding: 12px;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-family: inherit;
+      resize: vertical;
+      outline: none;
+      line-height: 1.6;
+      transition: border-color 0.2s;
+    }
+    textarea:focus { border-color: #4299e1; }
+    .textarea-hint { font-size: 0.78rem; color: #a0aec0; margin-top: 6px; }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 10px 20px;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-primary {
+      background: #3182ce;
+      color: #fff;
+    }
+    .btn-primary:hover:not(:disabled) { background: #2b6cb0; }
+    .btn-primary:disabled { background: #bee3f8; cursor: not-allowed; }
+    .btn-secondary {
+      background: #edf2f7;
+      color: #4a5568;
+    }
+    .btn-secondary:hover { background: #e2e8f0; }
+    .btn-row { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+
+    /* Loading */
+    .spinner {
+      width: 16px; height: 16px;
+      border: 2px solid rgba(255,255,255,0.4);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      display: none;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Status */
+    .status {
+      font-size: 0.85rem;
+      padding: 8px 12px;
+      border-radius: 8px;
+      margin-top: 10px;
+      display: none;
+    }
+    .status.error { background: #fff5f5; color: #c53030; border: 1px solid #feb2b2; display: block; }
+    .status.info { background: #ebf8ff; color: #2b6cb0; border: 1px solid #bee3f8; display: block; }
+
+    /* Results */
+    #result-section { display: none; }
+
+    .score-summary {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      padding: 16px;
+      background: linear-gradient(135deg, #ebf8ff 0%, #e9d8fd 100%);
+      border-radius: 10px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    .score-total { text-align: center; }
+    .score-total .num {
+      font-size: 2.8rem;
+      font-weight: 800;
+      color: #2b6cb0;
+      line-height: 1;
+    }
+    .score-total .denom { font-size: 0.9rem; color: #718096; }
+    .score-divider { width: 1px; height: 50px; background: #cbd5e0; }
+    .score-severity { flex: 1; }
+    .severity-label { font-size: 0.78rem; color: #718096; margin-bottom: 2px; }
+    .severity-value { font-size: 1.4rem; font-weight: 700; color: #553c9a; }
+
+    /* Progress bar */
+    .progress-wrap { margin-top: 8px; background: #e2e8f0; border-radius: 999px; height: 8px; width: 100%; }
+    .progress-bar { height: 8px; border-radius: 999px; background: linear-gradient(90deg, #4299e1, #9f7aea); transition: width 0.6s ease; }
+
+    /* Table */
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+    th {
+      background: #f7fafc;
+      padding: 10px 12px;
+      text-align: left;
+      font-weight: 700;
+      color: #4a5568;
+      border-bottom: 2px solid #e2e8f0;
+      white-space: nowrap;
+    }
+    td {
+      padding: 10px 12px;
+      border-bottom: 1px solid #f0f4f8;
+      vertical-align: top;
+      line-height: 1.5;
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #f7fafc; }
+
+    .score-cell {
+      font-size: 1.1rem;
+      font-weight: 700;
+      text-align: center;
+    }
+    .score-high { color: #276749; }
+    .score-mid { color: #975a16; }
+    .score-low { color: #c53030; }
+
+    .tag-estimated {
+      display: inline-block;
+      font-size: 0.7rem;
+      padding: 1px 6px;
+      background: #fefcbf;
+      color: #744210;
+      border: 1px solid #f6e05e;
+      border-radius: 4px;
+      margin-left: 4px;
+      vertical-align: middle;
+      white-space: nowrap;
+    }
+    .tag-recorded {
+      display: inline-block;
+      font-size: 0.7rem;
+      padding: 1px 6px;
+      background: #f0fff4;
+      color: #276749;
+      border: 1px solid #9ae6b4;
+      border-radius: 4px;
+      margin-left: 4px;
+      vertical-align: middle;
+      white-space: nowrap;
+    }
+
+    .item-name { font-weight: 600; }
+    .judgment { color: #4a5568; }
+    .rationale { color: #718096; font-size: 0.82rem; }
+
+    /* Copy result box */
+    .copy-hint { font-size: 0.78rem; color: #a0aec0; margin-top: 6px; }
+
+    /* Legend */
+    .legend { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 10px; }
+    .legend-item { display: flex; align-items: center; gap: 4px; font-size: 0.8rem; color: #718096; }
+
+    @media (max-width: 600px) {
+      .score-divider { display: none; }
+      h1 { font-size: 1.2rem; }
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h1>Barthel Index 採点ツール</h1>
+  <p class="subtitle">患者情報を入力してAIがBI全10項目を採点します</p>
+
+  <!-- API Key -->
+  <div class="card">
+    <div class="card-title">Anthropic API キー</div>
+    <div class="api-row">
+      <input type="password" id="api-key" placeholder="sk-ant-..." autocomplete="off">
+      <label class="api-save-label">
+        <input type="checkbox" id="save-key"> ブラウザに保存
+      </label>
+    </div>
+    <div id="api-status" class="status"></div>
+  </div>
+
+  <!-- Patient Info -->
+  <div class="card">
+    <div class="card-title">患者情報（自由記載）</div>
+    <textarea id="patient-info" placeholder="例）80歳女性。右被殻出血後。左片麻痺あり。食事は介助なしで摂取可能。移乗は一部介助。トイレ動作は見守りで可能。入浴は全介助。歩行は歩行器使用で監視下可。階段は不可。更衣は上衣自立、下衣介助。排便・排尿は失禁なし。"></textarea>
+    <p class="textarea-hint">記載がない項目は疾患・状態から臨床的に推定して採点します（【推定】タグで表示）</p>
+    <div class="btn-row">
+      <button class="btn btn-primary" id="score-btn" onclick="scoreBI()">
+        <span id="btn-spinner" class="spinner"></span>
+        <span id="btn-label">AI採点する</span>
+      </button>
+    </div>
+    <div id="score-status" class="status"></div>
+  </div>
+
+  <!-- Results -->
+  <div id="result-section">
+    <div class="card">
+      <div class="card-title">採点結果</div>
+
+      <div class="score-summary">
+        <div class="score-total">
+          <div class="num" id="total-score">--</div>
+          <div class="denom">/ 100点</div>
+        </div>
+        <div class="score-divider"></div>
+        <div class="score-severity">
+          <div class="severity-label">重症度</div>
+          <div class="severity-value" id="severity-label">--</div>
+          <div class="progress-wrap">
+            <div class="progress-bar" id="progress-bar" style="width:0%"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table id="result-table">
+          <thead>
+            <tr>
+              <th>項目</th>
+              <th>判定</th>
+              <th style="text-align:center;">点数</th>
+              <th>根拠・推定理由</th>
+            </tr>
+          </thead>
+          <tbody id="result-tbody"></tbody>
+        </table>
+      </div>
+
+      <div class="legend">
+        <div class="legend-item"><span class="tag-recorded">記載あり</span> 患者情報から直接判定</div>
+        <div class="legend-item"><span class="tag-estimated">推定</span> 疾患・状態から臨床的に推定</div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-secondary" onclick="copyResult()">結果をコピー（カルテ用）</button>
+      </div>
+      <p class="copy-hint" id="copy-hint"></p>
+    </div>
+  </div>
+</div>
+
+<script>
+// BI items definition
+const BI_ITEMS = [
+  { id: 'feeding',    name: '食事',             maxScore: 10 },
+  { id: 'transfer',   name: '車椅子↔ベッド移乗', maxScore: 15 },
+  { id: 'grooming',   name: '整容',             maxScore: 5  },
+  { id: 'toilet',     name: 'トイレ動作',        maxScore: 10 },
+  { id: 'bathing',    name: '入浴',             maxScore: 5  },
+  { id: 'mobility',   name: '歩行',             maxScore: 15 },
+  { id: 'stairs',     name: '階段昇降',          maxScore: 10 },
+  { id: 'dressing',   name: '更衣',             maxScore: 10 },
+  { id: 'bowels',     name: '排便コントロール',   maxScore: 10 },
+  { id: 'bladder',    name: '排尿コントロール',   maxScore: 10 },
+];
+
+// Load saved API key
+window.addEventListener('DOMContentLoaded', () => {
+  const saved = localStorage.getItem('bi_tool_api_key');
+  if (saved) {
+    document.getElementById('api-key').value = saved;
+    document.getElementById('save-key').checked = true;
+  }
+});
+
+function getApiKey() {
+  const key = document.getElementById('api-key').value.trim();
+  const save = document.getElementById('save-key').checked;
+  if (save && key) {
+    localStorage.setItem('bi_tool_api_key', key);
+  } else if (!save) {
+    localStorage.removeItem('bi_tool_api_key');
+  }
+  return key;
+}
+
+function getSeverity(score) {
+  if (score === 100) return '完全自立';
+  if (score >= 75)  return '軽度';
+  if (score >= 50)  return '中等度';
+  if (score >= 25)  return '重度';
+  return '全介助';
+}
+
+function scoreColor(score, max) {
+  const ratio = score / max;
+  if (ratio >= 0.8) return 'score-high';
+  if (ratio >= 0.4) return 'score-mid';
+  return 'score-low';
+}
+
+async function scoreBI() {
+  const apiKey = getApiKey();
+  if (!apiKey) {
+    showStatus('score-status', 'error', 'APIキーを入力してください。');
+    return;
+  }
+  const patientInfo = document.getElementById('patient-info').value.trim();
+  if (!patientInfo) {
+    showStatus('score-status', 'error', '患者情報を入力してください。');
+    return;
+  }
+
+  setLoading(true);
+  showStatus('score-status', 'info', 'AIが採点中です。しばらくお待ちください…');
+  document.getElementById('result-section').style.display = 'none';
+
+  const systemPrompt = `あなたはリハビリテーション専門医です。患者情報からBarthel Index（BI）の全10項目を採点してください。
+
+各項目について以下のJSON形式で返答してください。それ以外のテキストは一切出力しないでください。
+
+{
+  "items": [
+    {
+      "id": "feeding",
+      "name": "食事",
+      "score": 数値,
+      "maxScore": 10,
+      "judgment": "判定名（例：自立/一部介助/全介助）",
+      "estimated": true/false,
+      "rationale": "採点根拠または推定理由（1〜2文）"
+    },
+    ...
+  ]
+}
+
+【採点基準】
+- 食事(0/5/10): 0=全介助, 5=一部介助, 10=自立
+- 車椅子↔ベッド移乗(0/5/10/15): 0=不可/全介助, 5=多大な介助, 10=少量の介助/監視, 15=自立
+- 整容(0/5): 0=要介助, 5=自立
+- トイレ動作(0/5/10): 0=全介助, 5=一部介助, 10=自立
+- 入浴(0/5): 0=要介助, 5=自立
+- 歩行(0/5/10/15): 0=歩行不能, 5=車椅子操作自立, 10=歩行可能(介助あり), 15=自立(補助具可)
+- 階段昇降(0/5/10): 0=不能, 5=介助要, 10=自立(補助具可)
+- 更衣(0/5/10): 0=全介助, 5=一部介助, 10=自立
+- 排便コントロール(0/5/10): 0=失禁/全介助, 5=時々失禁/座薬介助要, 10=コントロール良好
+- 排尿コントロール(0/5/10): 0=失禁/全介助, 5=時々失禁, 10=コントロール良好
+
+【推定ルール】
+- 患者情報に明記されていない項目は疾患・機能障害から臨床的に推定し estimated: true とする
+- 明記されている項目は estimated: false とする
+
+必ずJSON形式のみで返答すること。`;
+
+  const userMessage = `以下の患者情報からBarthel Indexを採点してください：\n\n${patientInfo}`;
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 2000,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: userMessage }],
+      }),
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err?.error?.message || `APIエラー (${response.status})`);
+    }
+
+    const data = await response.json();
+    const text = data.content?.[0]?.text || '';
+
+    // Extract JSON
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error('AIの返答からJSONを取得できませんでした。');
+
+    const result = JSON.parse(jsonMatch[0]);
+    renderResults(result);
+    showStatus('score-status', '', '');
+
+  } catch (e) {
+    showStatus('score-status', 'error', `エラー: ${e.message}`);
+  } finally {
+    setLoading(false);
+  }
+}
+
+function renderResults(result) {
+  const items = result.items || [];
+  const totalScore = items.reduce((s, i) => s + (i.score || 0), 0);
+  const severity = getSeverity(totalScore);
+
+  document.getElementById('total-score').textContent = totalScore;
+  document.getElementById('severity-label').textContent = severity;
+  document.getElementById('progress-bar').style.width = totalScore + '%';
+
+  const tbody = document.getElementById('result-tbody');
+  tbody.innerHTML = '';
+
+  items.forEach(item => {
+    const tr = document.createElement('tr');
+    const colorClass = scoreColor(item.score, item.maxScore);
+    const tag = item.estimated
+      ? '<span class="tag-estimated">推定</span>'
+      : '<span class="tag-recorded">記載あり</span>';
+
+    tr.innerHTML = `
+      <td><span class="item-name">${item.name}</span>${tag}</td>
+      <td class="judgment">${item.judgment || ''}</td>
+      <td class="score-cell ${colorClass}">${item.score}<span style="font-size:0.7rem;font-weight:400;color:#a0aec0">/${item.maxScore}</span></td>
+      <td class="rationale">${item.rationale || ''}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  // Total row
+  const totalTr = document.createElement('tr');
+  totalTr.style.background = '#f7fafc';
+  totalTr.innerHTML = `
+    <td colspan="2" style="font-weight:700;text-align:right;padding:12px;">合計</td>
+    <td class="score-cell" style="font-size:1.3rem;font-weight:800;color:#2b6cb0;">${totalScore}<span style="font-size:0.7rem;font-weight:400;color:#a0aec0">/100</span></td>
+    <td style="font-weight:600;color:#553c9a;">${severity}</td>
+  `;
+  tbody.appendChild(totalTr);
+
+  // Store for copy
+  window._biResult = { items, totalScore, severity };
+
+  document.getElementById('result-section').style.display = 'block';
+  document.getElementById('result-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function copyResult() {
+  const r = window._biResult;
+  if (!r) return;
+
+  const today = new Date();
+  const dateStr = `${today.getFullYear()}/${String(today.getMonth()+1).padStart(2,'0')}/${String(today.getDate()).padStart(2,'0')}`;
+
+  let text = `【Barthel Index 採点】${dateStr}\n`;
+  text += `${'─'.repeat(40)}\n`;
+
+  r.items.forEach(item => {
+    const est = item.estimated ? '【推定】' : '　　　　';
+    text += `${est}${item.name.padEnd(12)}${item.judgment.padEnd(10)}${item.score}/${item.maxScore}点\n`;
+  });
+
+  text += `${'─'.repeat(40)}\n`;
+  text += `合計：${r.totalScore}/100点　重症度：${r.severity}\n`;
+  text += `\n※【推定】はAIが疾患・状態から臨床的に推定した項目です。`;
+
+  navigator.clipboard.writeText(text).then(() => {
+    document.getElementById('copy-hint').textContent = 'クリップボードにコピーしました。カルテに貼り付けてください。';
+    setTimeout(() => { document.getElementById('copy-hint').textContent = ''; }, 4000);
+  }).catch(() => {
+    document.getElementById('copy-hint').textContent = 'コピーに失敗しました。ブラウザの権限設定をご確認ください。';
+  });
+}
+
+function showStatus(id, type, message) {
+  const el = document.getElementById(id);
+  el.className = 'status' + (type ? ' ' + type : '');
+  el.textContent = message;
+  if (!type) el.style.display = 'none';
+}
+
+function setLoading(loading) {
+  const btn = document.getElementById('score-btn');
+  const spinner = document.getElementById('btn-spinner');
+  const label = document.getElementById('btn-label');
+  btn.disabled = loading;
+  spinner.style.display = loading ? 'block' : 'none';
+  label.textContent = loading ? '採点中…' : 'AI採点する';
+}
+</script>
+</body>
+</html>
