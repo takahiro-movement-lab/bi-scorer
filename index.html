@@ -322,6 +322,11 @@ window.addEventListener('DOMContentLoaded', () => {
     document.getElementById('api-key').value = saved;
     document.getElementById('save-key').checked = true;
   }
+  // Safari autofill対策: 強制クリア
+  setTimeout(() => {
+    const ta = document.getElementById('patient-info');
+    if (ta && !ta.dataset.userEdited) ta.value = '';
+  }, 100);
 });
 
 function getApiKey() {
