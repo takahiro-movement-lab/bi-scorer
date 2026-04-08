@@ -322,11 +322,15 @@ window.addEventListener('DOMContentLoaded', () => {
     document.getElementById('api-key').value = saved;
     document.getElementById('save-key').checked = true;
   }
-  // Safari autofill対策: 強制クリア
-  setTimeout(() => {
+  // Safari autofill対策: 複数回強制クリア
+  const clearAutofill = () => {
     const ta = document.getElementById('patient-info');
     if (ta && !ta.dataset.userEdited) ta.value = '';
-  }, 100);
+  };
+  [0, 50, 100, 300, 500, 1000].forEach(ms => setTimeout(clearAutofill, ms));
+  document.getElementById('patient-info').addEventListener('input', function() {
+    this.dataset.userEdited = 'true';
+  });
 });
 
 function getApiKey() {
