@@ -242,7 +242,7 @@
   <!-- Patient Info -->
   <div class="card">
     <div class="card-title">患者情報（自由記載）</div>
-    <textarea id="patient-info" name="patient-info-nofill" autocomplete="nope" placeholder="例）80歳女性。右被殻出血後。左片麻痺あり。食事は介助なしで摂取可能。移乗は一部介助。トイレ動作は見守りで可能。入浴は全介助。歩行は歩行器使用で監視下可。階段は不可。更衣は上衣自立、下衣介助。排便・排尿は失禁なし。"></textarea>
+    <textarea id="patient-info" readonly placeholder="例）80歳女性。右被殻出血後。左片麻痺あり。食事は介助なしで摂取可能。移乗は一部介助。トイレ動作は見守りで可能。入浴は全介助。歩行は歩行器使用で監視下可。階段は不可。更衣は上衣自立、下衣介助。排便・排尿は失禁なし。"></textarea>
     <p class="textarea-hint">記載がない項目は疾患・状態から臨床的に推定して採点します（【推定】タグで表示）</p>
     <div class="btn-row">
       <button class="btn btn-primary" id="score-btn" onclick="scoreBI()">
@@ -322,15 +322,17 @@ window.addEventListener('DOMContentLoaded', () => {
     document.getElementById('api-key').value = saved;
     document.getElementById('save-key').checked = true;
   }
-  // Safari autofill対策: 複数回強制クリア
-  const clearAutofill = () => {
-    const ta = document.getElementById('patient-info');
-    if (ta && !ta.dataset.userEdited) ta.value = '';
-  };
-  [0, 50, 100, 300, 500, 1000].forEach(ms => setTimeout(clearAutofill, ms));
-  document.getElementById('patient-info').addEventListener('input', function() {
-    this.dataset.userEdited = 'true';
-  });
+  // Safari autofill対策: readonly で自動入力を防ぎ、クリック時に解除
+  const ta = document.getElementById('patient-info');
+  ta.addEventListener('click', function() {
+    this.removeAttribute('readonly');
+    this.value = '';
+    this.focus();
+  }, { once: true });
+  ta.addEventListener('focus', function() {
+    this.removeAttribute('readonly');
+    this.value = '';
+  }, { once: true });
 });
 
 function getApiKey() {
