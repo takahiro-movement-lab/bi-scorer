@@ -244,6 +244,7 @@
     <div class="card-title">患者情報（自由記載）</div>
     <textarea id="patient-info" readonly placeholder="例）80歳女性。右被殻出血後。左片麻痺あり。食事は介助なしで摂取可能。移乗は一部介助。トイレ動作は見守りで可能。入浴は全介助。歩行は歩行器使用で監視下可。階段は不可。更衣は上衣自立、下衣介助。排便・排尿は失禁なし。"></textarea>
     <p class="textarea-hint">記載がない項目は疾患・状態から臨床的に推定して採点します（【推定】タグで表示）</p>
+    <p class="textarea-hint">氏名・ID・生年月日などの個人が分かる情報は入れないでください。入力した文章は、採点のために Anthropic の API に送られます。</p>
     <div class="btn-row">
       <button class="btn btn-primary" id="score-btn" onclick="scoreBI()">
         <span id="btn-spinner" class="spinner"></span>
@@ -426,7 +427,7 @@ async function scoreBI() {
         'anthropic-dangerous-direct-browser-access': 'true',
       },
       body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
+        model: 'claude-haiku-5-5',
         max_tokens: 2000,
         system: systemPrompt,
         messages: [{ role: 'user', content: userMessage }],
@@ -458,7 +459,7 @@ async function scoreBI() {
 
 function renderResults(result) {
   const items = result.items || [];
-  const totalScore = items.reduce((s, i) => s + (i.score || 0), 0);
+  const totalScore = items.reduce((s, i) => s + (Number.isFinite(i.score) ? i.score : 0), 0);
   const severity = getSeverity(totalScore);
 
   document.getElementById('total-score').textContent = totalScore;
@@ -471,16 +472,34 @@ function renderResults(result) {
   items.forEach(item => {
     const tr = document.createElement('tr');
     const colorClass = scoreColor(item.score, item.maxScore);
-    const tag = item.estimated
-      ? '<span class="tag-estimated">推定</span>'
-      : '<span class="tag-recorded">記載あり</span>';
 
-    tr.innerHTML = `
-      <td><span class="item-name">${item.name}</span>${tag}</td>
-      <td class="judgment">${item.judgment || ''}</td>
-      <td class="score-cell ${colorClass}">${item.score}<span style="font-size:0.7rem;font-weight:400;color:#a0aec0">/${item.maxScore}</span></td>
-      <td class="rationale">${item.rationale || ''}</td>
-    `;
+    // AI の返答は信用できない文字列として扱い、textContent で入れる（innerHTML にしない）
+    const tdName = document.createElement('td');
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'item-name';
+    nameSpan.textContent = item.name ?? '';
+    const tag = document.createElement('span');
+    tag.className = item.estimated ? 'tag-estimated' : 'tag-recorded';
+    tag.textContent = item.estimated ? '推定' : '記載あり';
+    tdName.append(nameSpan, tag);
+
+    const tdJudgment = document.createElement('td');
+    tdJudgment.className = 'judgment';
+    tdJudgment.textContent = item.judgment ?? '';
+
+    const tdScore = document.createElement('td');
+    tdScore.className = `score-cell ${colorClass}`;
+    tdScore.textContent = String(item.score ?? 0);
+    const maxSpan = document.createElement('span');
+    maxSpan.style.cssText = 'font-size:0.7rem;font-weight:400;color:#a0aec0';
+    maxSpan.textContent = `/${item.maxScore ?? ''}`;
+    tdScore.appendChild(maxSpan);
+
+    const tdRationale = document.createElement('td');
+    tdRationale.className = 'rationale';
+    tdRationale.textContent = item.rationale ?? '';
+
+    tr.append(tdName, tdJudgment, tdScore, tdRationale);
     tbody.appendChild(tr);
   });
 
@@ -513,7 +532,7 @@ function copyResult() {
 
   r.items.forEach(item => {
     const est = item.estimated ? '【推定】' : '　　　　';
-    text += `${est}${item.name.padEnd(12)}${item.judgment.padEnd(10)}${item.score}/${item.maxScore}点\n`;
+    text += `${est}${String(item.name ?? '').padEnd(12)}${String(item.judgment ?? '').padEnd(10)}${item.score ?? 0}/${item.maxScore ?? ''}点\n`;
   });
 
   text += `${'─'.repeat(40)}\n`;
