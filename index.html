@@ -440,7 +440,8 @@ async function scoreBI() {
     }
 
     const data = await response.json();
-    const text = data.content?.[0]?.text || '';
+    // 思考ブロックが先頭に来ることがあるので、type が text の物だけをつなぐ（11/2 Codex 検品）
+    const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('') || '';
 
     // Extract JSON
     const jsonMatch = text.match(/\{[\s\S]*\}/);
